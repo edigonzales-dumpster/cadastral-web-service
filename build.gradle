@@ -1,0 +1,82 @@
+plugins {
+	id 'org.springframework.boot' version '2.1.9.RELEASE'
+	id 'io.spring.dependency-management' version '1.0.8.RELEASE'
+	id 'java'
+}
+
+apply from: "$rootDir/gradle/versioning.gradle"
+
+group = 'ch.so.agi.cis'
+
+sourceCompatibility = '1.8'
+
+repositories {
+    jcenter()
+	mavenCentral()
+}
+
+configurations {
+    jaxb
+    developmentOnly
+    runtimeClasspath {
+        extendsFrom developmentOnly
+    }    
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework:spring-oxm:5.1.6.RELEASE'
+    implementation 'org.locationtech.jts:jts-core:1.16.1'
+    implementation 'org.postgresql:postgresql:42.2.8'
+
+    implementation 'javax.xml.bind:jaxb-api:2.3.0'
+    implementation 'com.sun.xml.bind:jaxb-core:2.3.0'
+    implementation 'com.sun.xml.bind:jaxb-impl:2.3.0'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    jaxb (
+        'com.sun.xml.bind:jaxb-xjc:2.2.7',
+        'com.sun.xml.bind:jaxb-impl:2.2.7'
+    )
+
+}
+
+def generatedXjcSources = "$buildDir/xjc/java"
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/main/java',"$generatedXjcSources"]
+        }
+    }
+}
+
+task jaxb {
+    System.setProperty('javax.xml.accessExternalSchema', 'all')
+    inputs.files fileTree(dir: 'src/main/xsd', include: ['*.xsd'])
+    inputs.files fileTree(dir: 'src/main/xjb', include: ['*.xjb'])
+    outputs.files fileTree(dir: "$generatedXjcSources")
+    
+    doLast {
+        mkdir "$generatedXjcSources"
+
+        ant.taskdef(
+            name: 'xjc',
+            classname: 'com.sun.tools.xjc.XJCTask',
+            classpath: configurations.jaxb.asPath
+        )
+
+        ant.xjc(
+            destdir: "$generatedXjcSources",
+            language: 'XMLSCHEMA',
+            extension: true
+        ){
+            schema(dir: "src/main/xsd", includes: "CadastralExtract.xsd")
+            binding(dir: "src/main/xjb", includes: "binding.xjb")
+        }
+    }
+}
+compileJava.dependsOn jaxb
