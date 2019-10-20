@@ -1,0 +1,39 @@
+version: '3'
+services:
+  oereb-db:
+    image: sogis/oereb-db-data
+    environment:
+      PG_DATABASE: oereb
+      PG_LOCALE: de_CH.UTF-8
+      PG_PRIMARY_PORT: 5432
+      PG_MODE: primary
+      PG_USER: admin
+      PG_PASSWORD: admin
+      PG_PRIMARY_USER: repl
+      PG_PRIMARY_PASSWORD: repl
+      PG_ROOT_PASSWORD: secret
+      PG_WRITE_USER: gretl
+      PG_WRITE_PASSWORD: gretl
+      PG_READ_USER: ogc_server
+      PG_READ_PASSWORD: ogc_server
+    networks:
+      - cadastralinfoservice
+    ports:
+      - "54321:5432"
+  info-service:
+    image: sogis/cadastral-info-service
+    depends_on:
+      - oereb-db
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DBUSER: gretl
+      DBPWD: gretl
+      DBURL: jdbc:postgresql://oereb-db:5432/oereb
+    networks:
+      - cadastralinfoservice
+    ports:
+      - "8080:8080"
+networks:
+  cadastralinfoservice:
+
+    

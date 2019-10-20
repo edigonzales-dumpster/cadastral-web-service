@@ -35,6 +35,7 @@ dependencies {
     implementation 'javax.xml.bind:jaxb-api:2.3.0'
     implementation 'com.sun.xml.bind:jaxb-core:2.3.0'
     implementation 'com.sun.xml.bind:jaxb-impl:2.3.0'
+    runtimeOnly 'javax.activation:activation:1.1.1'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
@@ -42,7 +43,6 @@ dependencies {
         'com.sun.xml.bind:jaxb-xjc:2.2.7',
         'com.sun.xml.bind:jaxb-impl:2.2.7'
     )
-
 }
 
 def generatedXjcSources = "$buildDir/xjc/java"
