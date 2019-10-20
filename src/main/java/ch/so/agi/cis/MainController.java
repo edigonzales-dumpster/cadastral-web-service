@@ -33,6 +33,7 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.geom.PrecisionModel;
 import org.locationtech.jts.io.WKBReader;
+import org.locationtech.jts.io.WKBWriter;
 import org.locationtech.jts.io.ParseException;
 
 import org.slf4j.Logger;
@@ -188,6 +189,25 @@ public class MainController {
             realEstate.setMunicipality((String)municipality.get("gemeinde"));
         } catch (EmptyResultDataAccessException e) {
             logger.warn("no municipality for nbident {}", realEstate.getIdentND());
+        }
+        
+        WKBWriter encoder = new WKBWriter();
+        byte[] wkb = encoder.write(parcel.getGeometrie());        
+        sql = "SELECT\n" + 
+                "    string_agg(flurname.aname, ', ' ORDER BY flurname.aname) AS flurnamen\n" + 
+                "FROM\n" + 
+                "    live.dm01vch24lv95dnomenklatur_flurname AS flurname \n" + 
+                "WHERE\n" + 
+                "    ST_Intersects(ST_GeomFromWKB(?, 2056), flurname.geometrie) AND NOT ST_Touches(ST_GeomFromWKB(?, 2056), flurname.geometrie)";
+        try {
+            java.util.Map<String,Object> localnames=jdbcTemplate.queryForMap(sql, wkb, wkb);
+            
+            logger.info(localnames.toString());
+            logger.info((String)localnames.get("flurnamen"));
+            
+            realEstate.setLocalNames((String)localnames.get("flurnamen"));
+        } catch (EmptyResultDataAccessException e) {
+            logger.warn("no localnames for geometry {}", parcel.getGeometrie().toString());
         }
 
         
