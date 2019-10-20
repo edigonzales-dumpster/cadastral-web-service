@@ -13,8 +13,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
 import ch.so.geo.schema.agi.cadastralinfo._1_0.extract.Address;
+import ch.so.geo.schema.agi.cadastralinfo._1_0.extract.BuildingType;
 import ch.so.geo.schema.agi.cadastralinfo._1_0.extract.CadastralExtract;
 import ch.so.geo.schema.agi.cadastralinfo._1_0.extract.GetExtractByIdResponse;
+import ch.so.geo.schema.agi.cadastralinfo._1_0.extract.LandCoverShareType;
 import ch.so.geo.schema.agi.cadastralinfo._1_0.extract.ObjectFactory;
 import ch.so.geo.schema.agi.cadastralinfo._1_0.extract.Office;
 import ch.so.geo.schema.agi.cadastralinfo._1_0.extract.RealEstateDPR;
@@ -23,6 +25,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.GregorianCalendar;
 import java.util.List;
+import java.util.Map;
 
 import javax.xml.datatype.DatatypeConfigurationException;
 import javax.xml.datatype.DatatypeFactory;
@@ -42,12 +45,20 @@ import org.slf4j.Logger;
 public class MainController {
     private Logger logger = org.slf4j.LoggerFactory.getLogger(this.getClass());
 
+    private static final String TABLE_PLZOCH1LV95DPLZORTSCHAFT_PLZ6 = "plzoch1lv95dplzortschaft_plz6";
+    private static final String TABLE_PLZOCH1LV95DPLZORTSCHAFT_ORTSCHAFT = "plzoch1lv95dplzortschaft_ortschaft";
+    private static final String TABLE_PLZOCH1LV95DPLZORTSCHAFT_ORTSCHAFTSNAME = "plzoch1lv95dplzortschaft_ortschaftsname";
+    private static final String TABLE_DM01VCH24LV95DBODENBEDECKUNG_BOFLAECHE = "dm01vch24lv95dbodenbedeckung_boflaeche";
+    private static final String TABLE_DM01VCH24LV95DNOMENKLATUR_FLURNAME = "dm01vch24lv95dnomenklatur_flurname";
     private static final String TABLE_DM01VCH24LV95DLIEGENSCHAFTEN_LIEGENSCHAFT = "dm01vch24lv95dliegenschaften_liegenschaft";
     private static final String TABLE_DM01VCH24LV95DLIEGENSCHAFTEN_SELBSTRECHT = "dm01vch24lv95dliegenschaften_selbstrecht";
     private static final String TABLE_DM01VCH24LV95DLIEGENSCHAFTEN_BERGWERK = "dm01vch24lv95dliegenschaften_bergwerk";
     private static final String TABLE_DM01VCH24LV95DLIEGENSCHAFTEN_GRUNDSTUECK = "dm01vch24lv95dliegenschaften_grundstueck";
     private static final String TABLE_SO_G_V_0180822GRUNDBUCHKREISE_GRUNDBUCHKREIS = "so_g_v_0180822grundbuchkreise_grundbuchkreis";
     private static final String TABLE_SO_G_V_0180822NACHFUEHRUNGSKREISE_GEMEINDE = "so_g_v_0180822nachfuehrngskrise_gemeinde";
+    private static final String TABLE_DM01VCH24LV95DGEBAEUDEADRESSEN_GEBAEUDEEINGANG = "dm01vch24lv95dgebaeudeadressen_gebaeudeeingang";
+    private static final String TABLE_DM01VCH24LV95DGEBAEUDEADRESSEN_LOKALISATION = "dm01vch24lv95dgebaeudeadressen_lokalisation";
+    private static final String TABLE_DM01VCH24LV95DGEBAEUDEADRESSEN_LOKALISATIONSNAME = "dm01vch24lv95dgebaeudeadressen_lokalisationsname";
 
     protected static final String extractNS = "http://geo.so.ch/schema/AGI/CadastralInfo/1.0/Extract";
 
@@ -114,6 +125,7 @@ public class MainController {
         realEstate.setType(parcel.getArt());
         realEstate.setLandRegistryArea(Double.valueOf(parcel.getFlaechenmass()).intValue());
         
+        // Adressen Nachführungsgeometer und Grundbuchamt
         String sql = "SELECT\n" + 
                 "    gb.aname AS gb_name,\n" + 
                 "    gb.amtschreiberei AS gb_amtschreiberei,\n" + 
@@ -191,32 +203,146 @@ public class MainController {
             logger.warn("no municipality for nbident {}", realEstate.getIdentND());
         }
         
+        // Flurnamen
         WKBWriter encoder = new WKBWriter();
         byte[] wkb = encoder.write(parcel.getGeometrie());        
         sql = "SELECT\n" + 
-                "    string_agg(flurname.aname, ', ' ORDER BY flurname.aname) AS flurnamen\n" + 
+                "    flurname.aname AS flurname\n" + 
                 "FROM\n" + 
-                "    live.dm01vch24lv95dnomenklatur_flurname AS flurname \n" + 
+                "    "+getSchema()+"."+TABLE_DM01VCH24LV95DNOMENKLATUR_FLURNAME+" AS flurname \n" + 
                 "WHERE\n" + 
-                "    ST_Intersects(ST_GeomFromWKB(?, 2056), flurname.geometrie) AND NOT ST_Touches(ST_GeomFromWKB(?, 2056), flurname.geometrie)";
+                "    ST_Intersects(ST_GeomFromWKB(?, 2056), flurname.geometrie) AND NOT ST_Touches(ST_GeomFromWKB(?, 2056), flurname.geometrie) \n" + 
+                "ORDER BY \n" + 
+                "    flurname.aname";
         try {
-            java.util.Map<String,Object> localnames=jdbcTemplate.queryForMap(sql, wkb, wkb);
-            
-            logger.info(localnames.toString());
-            logger.info((String)localnames.get("flurnamen"));
-            
-            realEstate.setLocalNames((String)localnames.get("flurnamen"));
+            List<Map<String, Object>> localnames = jdbcTemplate.queryForList(sql, wkb, wkb);
+            localnames.stream().forEach(m -> {
+                realEstate.getLocalNames().add((String)m.get("flurname"));
+            });
         } catch (EmptyResultDataAccessException e) {
             logger.warn("no localnames for geometry {}", parcel.getGeometrie().toString());
         }
 
+        // Bodenbedeckungsanteile
+        sql = "WITH boflaeche AS \n" + 
+                "(\n" + 
+                "  SELECT\n" + 
+                "    ST_CollectionExtract(ST_Intersection(bodenbedeckung.geometrie, ST_GeomFromWKB(?, 2056)), 3) AS geom,\n" + 
+                "    CASE \n" + 
+                "        WHEN split_part(bodenbedeckung.art,'.', array_upper(string_to_array(bodenbedeckung.art, '.'), 1))='fliessendes' \n" + 
+                "            THEN 'fliessendes_Gewaesser'\n" + 
+                "        WHEN split_part(bodenbedeckung.art,'.', array_upper(string_to_array(bodenbedeckung.art, '.'), 1))='stehendes' \n" + 
+                "            THEN 'stehendes_Gewaesser'\n" + 
+                "        ELSE split_part(bodenbedeckung.art,'.', array_upper(string_to_array(bodenbedeckung.art, '.'), 1))\n" + 
+                "    END AS art\n" + 
+                "  FROM\n" + 
+                "    "+getSchema()+"."+TABLE_DM01VCH24LV95DBODENBEDECKUNG_BOFLAECHE+" AS bodenbedeckung\n" + 
+                "  WHERE\n" + 
+                "    ST_Intersects(bodenbedeckung.geometrie, ST_GeomFromWKB(?, 2056))\n" + 
+                ")\n" + 
+                "SELECT\n" + 
+                "  ST_Area(ST_Union(geom)) AS flaeche, \n" + 
+                "  art\n" + 
+                "FROM\n" + 
+                "(\n" + 
+                "  SELECT\n" + 
+                "    (ST_Dump(geom)).geom, \n" + 
+                "    boflaeche.art\n" + 
+                "  FROM\n" + 
+                "    boflaeche\n" + 
+                "  WHERE\n" + 
+                "    ST_IsEmpty(geom) = FALSE\n" + 
+                ") AS foo\n" + 
+                "WHERE\n" + 
+                "  ST_Area(geom) > 0.5\n" + 
+                "GROUP BY\n" + 
+                "  art\n" + 
+                "ORDER BY\n" + 
+                "  art\n" + 
+                ";";
         
+        List<LandCoverShareType> landCoverShares = jdbcTemplate.query(sql, new RowMapper<LandCoverShareType>() {
+            @Override
+            public LandCoverShareType mapRow(ResultSet rs, int rowNum) throws SQLException {
+                LandCoverShareType landCoverShareType = objectFactory.createLandCoverShareType();
+                landCoverShareType.setArea(rs.getInt("flaeche"));
+                landCoverShareType.setType(rs.getString("art"));
+                return landCoverShareType;
+            }
+        }, wkb, wkb);
+        
+        realEstate.getLandCoverShares().addAll(landCoverShares);
+        
+        // Adressen / Gebäude
+        sql = "WITH gebaeudeadresse AS \n" + 
+                "(\n" + 
+                "  SELECT\n" + 
+                "    gebaeudeingang.hausnummer,\n" + 
+                "    gebaeudeingang.gwr_egid,\n" + 
+                "    gebaeudeingang.gwr_edid,\n" + 
+                "    lokalisationsname.atext AS strassenname,\n" + 
+                "    ortschaftsname.atext AS ortschaftsname,\n" + 
+                "    plz.plz\n" + 
+                "  FROM\n" + 
+                "    (\n" + 
+                "        SELECT \n" + 
+                "            *\n" + 
+                "        FROM    \n" + 
+                "            "+getSchema()+"."+TABLE_DM01VCH24LV95DGEBAEUDEADRESSEN_GEBAEUDEEINGANG+" AS gebaeudeingang\n" + 
+                "        WHERE\n" + 
+                "            ST_Intersects(gebaeudeingang.lage, ST_GeomFromWKB(?, 2056))\n" + 
+                "    ) AS gebaeudeingang\n" + 
+                "    LEFT JOIN "+getSchema()+"."+TABLE_DM01VCH24LV95DGEBAEUDEADRESSEN_LOKALISATION+" AS lokalisation\n" + 
+                "    ON gebaeudeingang.gebaeudeeingang_von = lokalisation.t_id\n" + 
+                "    LEFT JOIN "+getSchema()+"."+TABLE_DM01VCH24LV95DGEBAEUDEADRESSEN_LOKALISATIONSNAME+" AS lokalisationsname\n" + 
+                "    ON lokalisationsname.benannte = lokalisation.t_id\n" + 
+                "    LEFT JOIN "+getSchema()+"."+TABLE_PLZOCH1LV95DPLZORTSCHAFT_PLZ6+" AS plz\n" + 
+                "    ON ST_Intersects(gebaeudeingang.lage, plz.flaeche)\n" + 
+                "    LEFT JOIN "+getSchema()+"."+TABLE_PLZOCH1LV95DPLZORTSCHAFT_ORTSCHAFT+" AS ortschaft\n" + 
+                "    ON ST_Intersects(gebaeudeingang.lage, ortschaft.flaeche)\n" + 
+                "    LEFT JOIN "+getSchema()+"."+TABLE_PLZOCH1LV95DPLZORTSCHAFT_ORTSCHAFTSNAME+" AS ortschaftsname\n" + 
+                "    ON ortschaft.t_id = ortschaftsname.ortschaftsname_von\n" + 
+                "  WHERE\n" + 
+                "    gebaeudeingang.istoffiziellebezeichnung = 'ja'\n" + 
+                ")\n" + 
+                "SELECT\n" + 
+                "    gwr_egid,\n" + 
+                "    gwr_edid,\n" + 
+                "    strassenname,\n" + 
+                "    hausnummer,\n" + 
+                "    plz,\n" + 
+                "    ortschaftsname\n" + 
+                "FROM\n" + 
+                "    gebaeudeadresse";
+        
+        List<BuildingType> buildings = jdbcTemplate.query(sql, new RowMapper<BuildingType>(){
+            @Override
+            public BuildingType mapRow(ResultSet rs, int rowNum) throws SQLException {
+                BuildingType building = objectFactory.createBuildingType();
+                Integer egidInt = (Integer) rs.getObject("gwr_egid");
+                if (egidInt != null) {
+                    building.setEgid(rs.getInt("gwr_egid"));
+                } 
+                Integer edidInt = (Integer) rs.getObject("gwr_edid");
+                if (edidInt != null) {
+                    building.setEdid(rs.getInt("gwr_edid"));
+                } 
+                Address address = new Address();
+                address.setNumber(rs.getString("hausnummer"));
+                address.setStreet(rs.getString("strassenname"));
+                address.setPostalCode(rs.getString("plz"));
+                address.setCity(rs.getString("ortschaftsname"));
+                building.setPostalAddress(address);
+                return building;
+            }
+        }, wkb);
+       
+        realEstate.getBuildings().addAll(buildings);
         
         extract.setRealEstate(realEstate);
-        
+    
         return extract;
     }
-    
     
     private Grundstueck getParcelByEgrid(String egrid) {
         PrecisionModel precisionModel=new PrecisionModel(1000.0);
