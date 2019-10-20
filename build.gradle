@@ -1,7 +1,8 @@
 plugins {
-	id 'org.springframework.boot' version '2.1.9.RELEASE'
-	id 'io.spring.dependency-management' version '1.0.8.RELEASE'
-	id 'java'
+    id 'org.springframework.boot' version '2.1.9.RELEASE'
+    id 'io.spring.dependency-management' version '1.0.8.RELEASE'
+    id 'java'
+    id "com.bmuschko.docker-remote-api" version "4.6.2"
 }
 
 apply from: "$rootDir/gradle/versioning.gradle"
@@ -12,7 +13,7 @@ sourceCompatibility = '1.8'
 
 repositories {
     jcenter()
-	mavenCentral()
+    mavenCentral()
 }
 
 configurations {
@@ -24,18 +25,18 @@ configurations {
 }
 
 dependencies {
-	implementation 'org.springframework.boot:spring-boot-starter-actuator'
-	implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
-	implementation 'org.springframework.boot:spring-boot-starter-web'
-	implementation 'org.springframework:spring-oxm:5.1.6.RELEASE'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework:spring-oxm:5.1.6.RELEASE'
     implementation 'org.locationtech.jts:jts-core:1.16.1'
     implementation 'org.postgresql:postgresql:42.2.8'
 
     implementation 'javax.xml.bind:jaxb-api:2.3.0'
     implementation 'com.sun.xml.bind:jaxb-core:2.3.0'
     implementation 'com.sun.xml.bind:jaxb-impl:2.3.0'
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'
-	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
     jaxb (
         'com.sun.xml.bind:jaxb-xjc:2.2.7',
@@ -80,3 +81,73 @@ task jaxb {
     }
 }
 compileJava.dependsOn jaxb
+
+// Build Docker image
+import com.bmuschko.gradle.docker.tasks.image.Dockerfile
+import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
+import com.bmuschko.gradle.docker.tasks.image.DockerPushImage
+
+docker {
+    registryCredentials {
+        username = System.env.dockerRegistryUser
+        password = System.env.dockerRegistryPass
+    }
+}
+
+task buildDockerImage(type: DockerBuildImage) {
+    description = "Build docker image."
+    inputDir = project.projectDir
+    tags = ["sogis/cadastral-info-service:"+ version, "sogis/cadastral-info-service:latest"]
+    labels = ["cadastral-info-service.created": new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()), 
+            "cadastral-info-service.git_commit":  getCheckedOutGitCommitHash(), 
+            "cadastral-info-service.travis_build": version]
+}
+
+task pushDockerImage_One(type: DockerPushImage) {
+    description = "Push docker image to hub.docker.com (images are UNTESTED)."
+    imageName = buildDockerImage.tags.get().toArray()[0]
+}
+
+task pushDockerImage_Two(type: DockerPushImage) {
+    description = "Push docker image to hub.docker.com (images are UNTESTED)."
+    imageName = buildDockerImage.tags.get().toArray()[1]
+}
+
+task pushDockerImages() {
+    description = "Collect all push images tasks."
+}
+
+pushDockerImages.dependsOn {
+    tasks.findAll { task -> task.name.startsWith('pushDockerImage_') }
+}
+
+import java.text.SimpleDateFormat
+
+def getCheckedOutGitCommitHash() {
+    'git log -1 --pretty=%H'.execute().text.trim()
+}
+
+def getTimestamp() {
+    def date = new Date()
+    return date.format('yyyy-MM-dd HH:mm:ss')
+}
+
+// Create a static text file with same meta information as the docker labels
+task versionTxt()  {
+    outputs.upToDateWhen { false }
+    doLast {
+        new File("version.txt").text = """
+Version: $version
+Revision: ${getCheckedOutGitCommitHash()}
+Buildtime: ${getTimestamp()}
+Application-name: cadastral-info-service
+"""
+    }
+}
+task copyVersionTxt(type: Copy) {
+    from "version.txt"
+    into "src/main/resources/static/"
+}
+copyVersionTxt.dependsOn(versionTxt)
+build.dependsOn(copyVersionTxt)
+classes.dependsOn(copyVersionTxt)
