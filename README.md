@@ -7,6 +7,12 @@ Proof-of-Concept für einen Service, der grundstücksbezogene Informationen aus 
 
 Der Aufruf `http://localhost:8080/extract/${EGRID}` liefert einen XML-Auszug. Das XML wird durch ein [Schema](src/main/xsd/CadastralExtract.xsd) beschrieben.
 
+Flughafen Grenchen:
+```
+http://localhost:8080/extract/CH870672603279
+```
+
+
 ## Betriebsdokumentation
 Bei jedem Git-Push wird mittels Travis das Docker-Image neu gebuildet und als sogis/cadastral-info-service mit den Tags `latest` und "Travis-Buildnummer" auf Docker Hub abgelegt. Auf der AGI-Testumgebung wird viertelstündlich das `latest`-Image deployed.
 
