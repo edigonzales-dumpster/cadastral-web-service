@@ -1,5 +1,5 @@
 plugins {
-    id 'org.springframework.boot' version '2.1.9.RELEASE'
+    id 'org.springframework.boot' version '2.2.0.RELEASE'
     id 'io.spring.dependency-management' version '1.0.8.RELEASE'
     id 'java'
     id "com.bmuschko.docker-remote-api" version "4.6.2"
@@ -7,9 +7,9 @@ plugins {
 
 apply from: "$rootDir/gradle/versioning.gradle"
 
-group = 'ch.so.agi.cis'
+group = 'ch.so.agi'
 
-sourceCompatibility = '1.8'
+sourceCompatibility = '11'
 
 repositories {
     jcenter()
@@ -31,18 +31,21 @@ dependencies {
     implementation 'org.springframework:spring-oxm:5.1.6.RELEASE'
     implementation 'org.locationtech.jts:jts-core:1.16.1'
     implementation 'org.postgresql:postgresql:42.2.8'
-
-    implementation 'javax.xml.bind:jaxb-api:2.3.0'
-    implementation 'com.sun.xml.bind:jaxb-core:2.3.0'
-    implementation 'com.sun.xml.bind:jaxb-impl:2.3.0'
+    implementation 'javax.xml.bind:jaxb-api:2.3.1'
+    implementation 'org.glassfish.jaxb:jaxb-runtime:2.3.1'
     runtimeOnly 'javax.activation:activation:1.1.1'
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    developmentOnly 'org.springframework.boot:spring-boot-devtools'
-
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'    
+    testImplementation('org.springframework.boot:spring-boot-starter-test') {
+        exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
+    }
     jaxb (
         'com.sun.xml.bind:jaxb-xjc:2.2.7',
         'com.sun.xml.bind:jaxb-impl:2.2.7'
     )
+}
+
+test {
+    useJUnitPlatform()
 }
 
 def generatedXjcSources = "$buildDir/xjc/java"
@@ -97,24 +100,27 @@ docker {
 task buildDockerImage(type: DockerBuildImage) {
     description = "Build docker image."
     inputDir = project.projectDir
-    tags = ["sogis/cadastral-info-service:"+ version, "sogis/cadastral-info-service:latest"]
-    labels = ["cadastral-info-service.created": new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()), 
-            "cadastral-info-service.git_commit":  getCheckedOutGitCommitHash(), 
-            "cadastral-info-service.travis_build": version]
+    tags = ["sogis/cadastral-web-service:"+ version, "sogis/cadastral-web-service:latest"]
+    labels = ["cadastral-web-service.created": new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()), 
+            "cadastral-web-service.git_commit":  getCheckedOutGitCommitHash(), 
+            "cadastral-web-service.travis_build": version]
 }
 
-task pushDockerImage_One(type: DockerPushImage) {
-    description = "Push docker image to hub.docker.com (images are UNTESTED)."
-    imageName = buildDockerImage.tags.get().toArray()[0]
-}
+def tags = ["latest", version]
 
-task pushDockerImage_Two(type: DockerPushImage) {
-    description = "Push docker image to hub.docker.com (images are UNTESTED)."
-    imageName = buildDockerImage.tags.get().toArray()[1]
+tags.each { tag ->
+    def imageTag = tag.toString()
+    task "pushDockerImage_$imageTag"(type: DockerPushImage) {
+        description = "Push docker image to hub.docker.com: $imageTag"
+        imageName =  "sogis/parcel-info-service:$imageTag"
+    }
 }
 
 task pushDockerImages() {
-    description = "Collect all push images tasks."
+    description = "Push docker images to hub.docker.com."
+    dependsOn {
+        tasks.findAll { task -> task.name.startsWith('pushDockerImage_') }
+    }    
 }
 
 pushDockerImages.dependsOn {
@@ -140,7 +146,7 @@ task versionTxt()  {
 Version: $version
 Revision: ${getCheckedOutGitCommitHash()}
 Buildtime: ${getTimestamp()}
-Application-name: cadastral-info-service
+Application-name: cadastral-web-service
 """
     }
 }

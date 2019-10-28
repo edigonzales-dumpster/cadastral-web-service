@@ -1,12 +1,12 @@
-package ch.so.agi.cis;
+package ch.so.agi.cadastral.webservice;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class CadastralInfoServiceApplication {
+public class CadastralWebServiceApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(CadastralInfoServiceApplication.class, args);
+		SpringApplication.run(CadastralWebServiceApplication.class, args);
 	}
 }

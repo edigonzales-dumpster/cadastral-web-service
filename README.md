@@ -56,7 +56,7 @@ docker run --rm --name oereb-db-data -p 54321:5432 --hostname primary \
 sogis/oereb-db-data:latest
 ```
 
-Falls das Docker-Images des Services zusammen mit der Datenbank muss ein gemeinsames Netzwerk erstellt werden:
+Falls das Docker-Image des Services zusammen mit der Datenbank verwendet wird, muss ein gemeinsames Netzwerk erstellt werden:
 
 ```
 docker-compose up

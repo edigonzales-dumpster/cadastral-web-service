@@ -1,4 +1,4 @@
-package ch.so.agi.cis;
+package ch.so.agi.cadastral.webservice;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;

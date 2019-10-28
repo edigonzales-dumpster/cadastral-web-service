@@ -1,4 +1,4 @@
-package ch.so.agi.cis;
+package ch.so.agi.cadastral.webservice;
 
 import org.locationtech.jts.geom.Geometry;
 
