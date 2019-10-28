@@ -112,7 +112,7 @@ tags.each { tag ->
     def imageTag = tag.toString()
     task "pushDockerImage_$imageTag"(type: DockerPushImage) {
         description = "Push docker image to hub.docker.com: $imageTag"
-        imageName =  "sogis/parcel-info-service:$imageTag"
+        imageName =  "sogis/cadastral-web-service:$imageTag"
     }
 }
 
