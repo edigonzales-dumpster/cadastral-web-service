@@ -74,6 +74,7 @@ public class MainController {
         return new ResponseEntity<String>("cadastral-info-service", HttpStatus.OK);
     }
 
+    // http://localhost:8080/extract/CH870672603279
     @GetMapping(value="/extract/{egrid}", consumes=MediaType.ALL_VALUE, produces = {MediaType.APPLICATION_XML_VALUE})
     public ResponseEntity<?> getExtractWithGeometryByEgrid(@PathVariable String egrid) {
         
@@ -124,6 +125,8 @@ public class MainController {
         realEstate.setSubunitOfLandRegister(parcel.getGbSubKreis());
         realEstate.setType(parcel.getArt());
         realEstate.setLandRegistryArea(Double.valueOf(parcel.getFlaechenmass()).intValue());
+        
+        realEstate.setPdfExtractUrl("https://geo.so.ch/api/v1/landreg/print/XXXXXXXX");
         
         // Adressen Nachführungsgeometer und Grundbuchamt
         String sql = "SELECT\n" + 
@@ -419,7 +422,7 @@ public class MainController {
         }catch(EmptyResultDataAccessException ex) {
             logger.warn("no gbkreis for nbident {}",gs.getNbident());
         }
-
+        
         return gs;   
     }
     
