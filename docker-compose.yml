@@ -29,10 +29,11 @@ services:
       DBUSER: gretl
       DBPWD: gretl
       DBURL: jdbc:postgresql://oereb-db:5432/oereb
+      SERVER_PORT: 8484
     networks:
       - cadastralinfoservice
     ports:
-      - "8080:8080"
+      - "8484:8484"
 networks:
   cadastralinfoservice:
 
