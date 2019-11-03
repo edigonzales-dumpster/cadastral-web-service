@@ -17,11 +17,11 @@ services:
       PG_READ_USER: ogc_server
       PG_READ_PASSWORD: ogc_server
     networks:
-      - cadastralinfoservice
+      - cadastralwebservice
     ports:
       - "54321:5432"
-  info-service:
-    image: sogis/cadastral-info-service
+  web-service:
+    image: sogis/cadastral-web-service
     depends_on:
       - oereb-db
     environment:
@@ -31,10 +31,10 @@ services:
       DBURL: jdbc:postgresql://oereb-db:5432/oereb
       SERVER_PORT: 8484
     networks:
-      - cadastralinfoservice
+      - cadastralwebservice
     ports:
       - "8484:8484"
 networks:
-  cadastralinfoservice:
+  cadastralwebservice:
 
     
