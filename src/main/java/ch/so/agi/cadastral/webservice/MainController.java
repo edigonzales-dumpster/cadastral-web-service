@@ -78,7 +78,7 @@ public class MainController {
     @GetMapping(value="/extract/{egrid}", consumes=MediaType.ALL_VALUE, produces = {MediaType.APPLICATION_XML_VALUE})
     public ResponseEntity<?> getExtractWithGeometryByEgrid(@PathVariable String egrid) {
         
-        Grundstueck parcel = this.getParcelByEgrid(egrid);
+        Grundstueck parcel = getParcelByEgrid(egrid);
         if(parcel==null) {
             return new ResponseEntity<Object>(HttpStatus.NO_CONTENT);
         }
@@ -120,6 +120,7 @@ public class MainController {
         extract.setCreationDate(today);
         
         RealEstateDPR realEstate = new RealEstateDPR();
+        realEstate.setNumber(parcel.getNummer());
         realEstate.setEGRID(egrid);
         realEstate.setIdentND(parcel.getNbident());
         realEstate.setSubunitOfLandRegister(parcel.getGbSubKreis());
