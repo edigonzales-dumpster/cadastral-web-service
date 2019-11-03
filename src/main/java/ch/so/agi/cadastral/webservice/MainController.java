@@ -383,7 +383,7 @@ public class MainController {
                         }
                         Grundstueck ret=new Grundstueck();
                         ret.setGeometrie(polygon);
-                        ret.setEgrid(egrid);
+                        ret.setEgrid(egrid); 
                         ret.setNummer(rs.getString("nummer"));
                         ret.setNbident(rs.getString("nbident"));
                         ret.setArt(rs.getString("art"));
