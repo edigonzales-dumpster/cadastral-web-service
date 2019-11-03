@@ -105,6 +105,7 @@ public class MainController {
         addressResponsibleOffice.setCity("Solothurn");
         addressResponsibleOffice.setEmail("agi@bd.so.ch");
         addressResponsibleOffice.setPhone("032 627 75 92");
+        addressResponsibleOffice.setWeb("https://agi.so.ch");
 
         responsibleOffice.setPostalAddress(addressResponsibleOffice);
         extract.setResponsibleOffice(responsibleOffice);
