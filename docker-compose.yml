@@ -25,7 +25,7 @@ services:
     depends_on:
       - oereb-db
     environment:
-      SPRING_PROFILES_ACTIVE: dev
+      SPRING_PROFILES_ACTIVE: prod
       DBUSER: gretl
       DBPWD: gretl
       DBURL: jdbc:postgresql://oereb-db:5432/oereb
